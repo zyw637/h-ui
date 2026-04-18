@@ -13,13 +13,20 @@ import (
 	"time"
 )
 
-func applyClashExtension(config bo.ClashConfig, raw string) (bo.ClashConfig, error) {
+func applyClashExtension(config bo.ClashConfig, raw string, nodeName string) (bo.ClashConfig, error) {
 	var extension bo.ClashExtension
 	if err := yaml.Unmarshal([]byte(raw), &extension); err != nil {
 		return config, fmt.Errorf("invalid clash extension yaml: %w", err)
 	}
 
 	if len(extension.ProxyGroups) > 0 {
+		for i := range extension.ProxyGroups {
+			for j := range extension.ProxyGroups[i].Proxies {
+				if extension.ProxyGroups[i].Proxies[j] == "__NODE__" {
+					extension.ProxyGroups[i].Proxies[j] = nodeName
+				}
+			}
+		}
 		config.ProxyGroups = extension.ProxyGroups
 	}
 	if len(extension.Rules) > 0 {
@@ -215,7 +222,7 @@ func Hysteria2Subscribe(conPass string, clientType string, host string) (string,
 				return "", "", err
 			}
 			if clashExtension.Value != nil && *clashExtension.Value != "" {
-				clashConfig, err = applyClashExtension(clashConfig, *clashExtension.Value)
+				clashConfig, err = applyClashExtension(clashConfig, *clashExtension.Value, hysteria2Name)
 				if err != nil {
 					return "", "", err
 				}
