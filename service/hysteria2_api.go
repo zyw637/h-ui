@@ -13,6 +13,22 @@ import (
 	"time"
 )
 
+func applyClashExtension(config bo.ClashConfig, raw string) (bo.ClashConfig, error) {
+	var extension bo.ClashExtension
+	if err := yaml.Unmarshal([]byte(raw), &extension); err != nil {
+		return config, fmt.Errorf("invalid clash extension yaml: %w", err)
+	}
+
+	if len(extension.ProxyGroups) > 0 {
+		config.ProxyGroups = extension.ProxyGroups
+	}
+	if len(extension.Rules) > 0 {
+		config.Rules = extension.Rules
+	}
+
+	return config, nil
+}
+
 func Hysteria2Auth(conPass string) (int64, string, error) {
 	if !Hysteria2IsRunning() {
 		return 0, "", errors.New("hysteria2 is not running")
@@ -193,20 +209,23 @@ func Hysteria2Subscribe(conPass string, clientType string, host string) (string,
 			},
 			Proxies: []interface{}{hysteria2},
 		}
-		clashConfigYaml, err := yaml.Marshal(&clashConfig)
-		if err != nil {
-			return "", "", err
-		}
-		configStr = string(clashConfigYaml)
 		if clientType == constant.Clash {
 			clashExtension, err := GetConfig(constant.ClashExtension)
 			if err != nil {
 				return "", "", err
 			}
 			if clashExtension.Value != nil && *clashExtension.Value != "" {
-				configStr = fmt.Sprintf("%s%s", configStr, *clashExtension.Value)
+				clashConfig, err = applyClashExtension(clashConfig, *clashExtension.Value)
+				if err != nil {
+					return "", "", err
+				}
 			}
 		}
+		clashConfigYaml, err := yaml.Marshal(&clashConfig)
+		if err != nil {
+			return "", "", err
+		}
+		configStr = string(clashConfigYaml)
 	} else if clientType == constant.V2rayN {
 		hysteria2Url, err := Hysteria2Url(*account.Id, strings.Split(host, ":")[0])
 		if err != nil {
